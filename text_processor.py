@@ -267,3 +267,7 @@ class AdvancedTextProcessor:
                 break
             
             context_parts.append(chunk_with_marker)
+            current_length += len(chunk_with_marker)
+        
+        return "".join(context_parts)
+
