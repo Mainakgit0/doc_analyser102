@@ -11,9 +11,9 @@
     }
   ],
   "env": {
-    "DATABASE_URL": "@database_url",
-    "GROQ_API_KEY": "@groq_api_key",
-    "SESSION_SECRET": "@session_secret"
+    "DATABASE_URL": "postgresql://postgres:[Mainakroy1@]@db.ldrnmfzczhhtlzycwdwj.supabase.co:5432/postgres",
+    "GROQ_API_KEY": "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",
+    "SESSION_SECRET": "b93aaf9ce169df07202a217c80327a2dfd6d79c4799397c3f1d6a6d593fd8f8d"
   },
   "functions": {
     "api/index.py": {
