@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+
+{% block title %}Query History - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="display-6 mb-3">
+                <i data-feather="clock" class="me-3"></i>
+                Query History
+            </h2>
+            <p class="text-muted">
+                View your previous document queries and results
+            </p>
+        </div>
+    </div>
+
+    <!-- History Table -->
+    {% if queries.items %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i data-feather="list" class="me-2"></i>
+                        Recent Queries
+                    </h5>
+                    <span class="badge bg-secondary">{{ queries.total }} total</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">
+                                        <i data-feather="calendar" class="me-1"></i>
+                                        Date
+                                    </th>
+                                    <th scope="col">
+                                        <i data-feather="file" class="me-1"></i>
+                                        Document
+                                    </th>
+                                    <th scope="col">
+                                        <i data-feather="help-circle" class="me-1"></i>
+                                        Questions
+                                    </th>
+                                    <th scope="col">
+                                        <i data-feather="clock" class="me-1"></i>
+                                        Time
+                                    </th>
+                                    <th scope="col">
+                                        <i data-feather="bar-chart" class="me-1"></i>
+                                        Stats
+                                    </th>
+                                    <th scope="col">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for query in queries.items %}
+                                <tr>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ query.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <div class="text-truncate" style="max-width: 200px;">
+                                            {% if query.document_filename %}
+                                                <i data-feather="upload" class="me-1 text-info"></i>
+                                                <span title="{{ query.document_filename }}">
+                                                    {{ query.document_filename }}
+                                                </span>
+                                            {% elif query.document_url %}
+                                                <i data-feather="link" class="me-1 text-info"></i>
+                                                <span title="{{ query.document_url }}">
+                                                    {{ query.document_url.split('/')[-1] or 'URL Document' }}
+                                                </span>
+                                            {% else %}
+                                                <i data-feather="file" class="me-1"></i>
+                                                Document
+                                            {% endif %}
+                                        </div>
+                                        <small class="text-muted">
+                                            {{ "{:,}".format(query.document_length) }} chars
+                                        </small>
+                                    </td>
+                                    <td>
+                                        {% set questions_list = query.questions|from_json %}
+                                        <span class="badge bg-primary">{{ questions_list|length }}</span>
+                                        {% if questions_list %}
+                                            <div class="mt-1">
+                                                <small class="text-muted text-truncate d-block" style="max-width: 250px;">
+                                                    {{ questions_list[0][:50] }}{% if questions_list[0]|length > 50 %}...{% endif %}
+                                                </small>
+                                                {% if questions_list|length > 1 %}
+                                                    <small class="text-muted">+ {{ questions_list|length - 1 }} more</small>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">
+                                            {{ "%.2f"|format(query.processing_time) }}s
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            <div>{{ query.chunks_created }} chunks</div>
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-info" 
+                                                onclick="showQueryDetails({{ query.id }})" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#queryModal">
+                                            <i data-feather="eye" class="me-1"></i>
+                                            View
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if queries.pages > 1 %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <nav aria-label="Query history pagination">
+                <ul class="pagination justify-content-center">
+                    <!-- Previous Page -->
+                    {% if queries.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('history', page=queries.prev_num) }}">
+                                <i data-feather="chevron-left" class="me-1"></i>
+                                Previous
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">
+                                <i data-feather="chevron-left" class="me-1"></i>
+                                Previous
+                            </span>
+                        </li>
+                    {% endif %}
+                    
+                    <!-- Page Numbers -->
+                    {% for page_num in queries.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != queries.page %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('history', page=page_num) }}">
+                                        {{ page_num }}
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                            {% endif %}
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">...</span>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    <!-- Next Page -->
+                    {% if queries.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('history', page=queries.next_num) }}">
+                                Next
+                                <i data-feather="chevron-right" class="ms-1"></i>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">
+                                Next
+                                <i data-feather="chevron-right" class="ms-1"></i>
+                            </span>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="row">
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i data-feather="inbox" class="text-muted mb-3" style="width: 4rem; height: 4rem;"></i>
+                <h4 class="text-muted">No Query History</h4>
+                <p class="text-muted">You haven't submitted any queries yet.</p>
+                <a href="{{ url_for('index') }}" class="btn btn-primary">
+                    <i data-feather="plus" class="me-2"></i>
+                    Submit Your First Query
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Action Buttons -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+                <i data-feather="plus" class="me-2"></i>
+                New Query
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Query Details Modal -->
+<div class="modal fade" id="queryModal" tabindex="-1" aria-labelledby="queryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="queryModalLabel">
+                    <i data-feather="eye" class="me-2"></i>
+                    Query Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="queryModalBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Function to show query details in modal
+async function showQueryDetails(queryId) {
+    const modalBody = document.getElementById('queryModalBody');
+    
+    // Show loading state
+    modalBody.innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    `;
+    
+    try {
+        const response = await fetch(`/api/query/${queryId}`);
+        if (!response.ok) throw new Error('Failed to load query details');
+        
+        const query = await response.json();
+        
+        // Build HTML content
+        let html = `
+            <div class="mb-4">
+                <h6 class="text-info mb-2">
+                    <i data-feather="file" class="me-2"></i>
+                    Document Information
+                </h6>
+                <div class="bg-dark p-3 rounded">
+                    ${query.document_filename ? `
+                        <p><strong>Filename:</strong> ${query.document_filename}</p>
+                    ` : ''}
+                    ${query.document_url ? `
+                        <p><strong>URL:</strong> <a href="${query.document_url}" target="_blank" class="text-info">${query.document_url}</a></p>
+                    ` : ''}
+                    <p><strong>Length:</strong> ${query.document_length.toLocaleString()} characters</p>
+                    <p><strong>Chunks Created:</strong> ${query.chunks_created}</p>
+                    <p><strong>Processing Time:</strong> ${query.processing_time.toFixed(2)} seconds</p>
+                    <p><strong>Date:</strong> ${new Date(query.created_at).toLocaleString()}</p>
+                </div>
+            </div>
+        `;
+        
+        // Add questions and answers
+        for (let i = 0; i < query.questions.length; i++) {
+            html += `
+                <div class="mb-4 ${i < query.questions.length - 1 ? 'border-bottom pb-3' : ''}">
+                    <h6 class="text-primary mb-2">
+                        <i data-feather="help-circle" class="me-2"></i>
+                        Question ${i + 1}:
+                    </h6>
+                    <p class="mb-3">${query.questions[i]}</p>
+                    
+                    <h6 class="text-success mb-2">
+                        <i data-feather="message-circle" class="me-2"></i>
+                        Answer:
+                    </h6>
+                    <div class="bg-secondary p-3 rounded">
+                        ${query.answers[i].replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        modalBody.innerHTML = html;
+        
+        // Re-initialize feather icons
+        feather.replace();
+        
+    } catch (error) {
+        modalBody.innerHTML = `
+            <div class="alert alert-danger">
+                <i data-feather="alert-circle" class="me-2"></i>
+                Error loading query details: ${error.message}
+            </div>
+        `;
+        feather.replace();
+    }
+}
+</script>
+{% endblock %}

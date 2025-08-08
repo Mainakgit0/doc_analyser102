@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container my-5">
+    <!-- Header Section -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="text-center">
+                <h1 class="display-4 fw-bold mb-3">
+                    <i data-feather="search" class="me-3"></i>
+                    Intelligent Document Query System
+                </h1>
+                <p class="lead text-muted">
+                    Upload documents or provide URLs and get highly accurate AI answers to your questions
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Section -->
+    {% if success and questions and answers %}
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card bg-dark border-success">
+                <div class="card-header bg-success text-dark">
+                    <h5 class="mb-0">
+                        <i data-feather="check-circle" class="me-2"></i>
+                        Query Results
+                        {% if processing_time %}
+                        <small class="float-end">
+                            <i data-feather="clock" class="me-1"></i>
+                            {{ "%.2f"|format(processing_time) }}s
+                        </small>
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for i in range(questions|length) %}
+                    <div class="mb-4 {% if not loop.last %}border-bottom pb-3{% endif %}">
+                        <h6 class="text-info mb-2">
+                            <i data-feather="help-circle" class="me-2"></i>
+                            Question {{ loop.index }}:
+                        </h6>
+                        <p class="mb-3 text-light">{{ questions[i] }}</p>
+                        
+                        <h6 class="text-success mb-2">
+                            <i data-feather="message-circle" class="me-2"></i>
+                            Answer:
+                        </h6>
+                        <div class="answer-text p-3 bg-secondary rounded">
+                            {{ answers[i]|safe|replace('\n\n', '</p><p>')|replace('\n', '<br>')|replace('<p></p>', '')|replace('</p><p>', '</p><p class="mb-2">') }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Query Form -->
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i data-feather="edit" class="me-2"></i>
+                        Submit Your Query
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('process_query') }}" 
+                          enctype="multipart/form-data" id="queryForm">
+                        
+                        <!-- Document Input -->
+                        <div class="mb-4">
+                            <h6 class="form-label">
+                                <i data-feather="file-text" class="me-2"></i>
+                                Document Source
+                            </h6>
+                            
+                            <!-- Tab Navigation -->
+                            <ul class="nav nav-pills mb-3" id="documentTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="url-tab" data-bs-toggle="pill" 
+                                            data-bs-target="#url-panel" type="button" role="tab">
+                                        <i data-feather="link" class="me-1"></i>
+                                        URL
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="upload-tab" data-bs-toggle="pill" 
+                                            data-bs-target="#upload-panel" type="button" role="tab">
+                                        <i data-feather="upload" class="me-1"></i>
+                                        Upload File
+                                    </button>
+                                </li>
+                            </ul>
+                            
+                            <!-- Tab Content -->
+                            <div class="tab-content" id="documentTabContent">
+                                <!-- URL Panel -->
+                                <div class="tab-pane fade show active" id="url-panel" role="tabpanel">
+                                    <input type="url" class="form-control" name="document_url" 
+                                           placeholder="https://example.com/document.pdf" 
+                                           id="documentUrl">
+                                    <div class="form-text">
+                                        <i data-feather="info" class="me-1"></i>
+                                        Supports PDF, DOCX, DOC, and text files from public URLs
+                                    </div>
+                                </div>
+                                
+                                <!-- Upload Panel -->
+                                <div class="tab-pane fade" id="upload-panel" role="tabpanel">
+                                    <input type="file" class="form-control" name="document_file" 
+                                           accept=".pdf,.docx,.doc,.txt" id="documentFile">
+                                    <div class="form-text">
+                                        <i data-feather="info" class="me-1"></i>
+                                        Maximum file size: 10MB. Supports PDF, DOCX, DOC, and TXT files
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Questions Input -->
+                        <div class="mb-4">
+                            <label for="questions" class="form-label">
+                                <i data-feather="help-circle" class="me-2"></i>
+                                Questions
+                                <span class="text-danger">*</span>
+                            </label>
+                            <textarea class="form-control" name="questions" rows="6" 
+                                      placeholder="Enter your questions, one per line:&#10;&#10;What are the main coverage types?&#10;What are the deductible amounts?&#10;What is excluded from coverage?"
+                                      required id="questions">{{ request.form.get('questions', '') }}</textarea>
+                            <div class="form-text">
+                                <i data-feather="info" class="me-1"></i>
+                                Enter one question per line. Be specific for better results.
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                <i data-feather="search" class="me-2"></i>
+                                <span class="btn-text">Process Query</span>
+                                <div class="spinner-border spinner-border-sm ms-2 d-none" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features Section -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <h4 class="text-center mb-4">
+                <i data-feather="zap" class="me-2"></i>
+                Enhanced Features
+            </h4>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i data-feather="cpu" class="text-primary mb-3" style="width: 2rem; height: 2rem;"></i>
+                    <h6>Advanced Text Processing</h6>
+                    <p class="text-muted small">TF-IDF similarity scoring with semantic chunking for better accuracy</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i data-feather="database" class="text-success mb-3" style="width: 2rem; height: 2rem;"></i>
+                    <h6>Smart Caching</h6>
+                    <p class="text-muted small">Document caching and request logging for faster performance</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i data-feather="target" class="text-warning mb-3" style="width: 2rem; height: 2rem;"></i>
+                    <h6>High Accuracy</h6>
+                    <p class="text-muted small">Enhanced prompt engineering and context-aware answer generation</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions Row -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('history') }}" class="btn btn-outline-secondary">
+                    <i data-feather="clock" class="me-2"></i>
+                    View History
+                </a>
+                <form method="POST" action="{{ url_for('clear_cache') }}" class="d-inline">
+                    <button type="submit" class="btn btn-outline-warning" 
+                            onclick="return confirm('Are you sure you want to clear the document cache?')">
+                        <i data-feather="trash-2" class="me-2"></i>
+                        Clear Cache
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
