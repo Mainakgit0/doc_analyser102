@@ -2,8 +2,6 @@ import re
 import nltk
 import logging
 from typing import List, Tuple, Dict
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
 # Download required NLTK data
@@ -150,7 +148,7 @@ class AdvancedTextProcessor:
             return ' '.join(words)
     
     def calculate_tfidf_similarity(self, query: str, chunks: List[str]) -> List[Tuple[float, str]]:
-        """Calculate TF-IDF cosine similarity between query and chunks"""
+        """Calculate TF-IDF cosine similarity between query and chunks using a lightweight approach"""
         if not chunks or not query:
             return []
         
@@ -158,35 +156,58 @@ class AdvancedTextProcessor:
         processed_query = self.preprocess_for_similarity(query)
         processed_chunks = [self.preprocess_for_similarity(chunk) for chunk in chunks]
         
-        # Create corpus (query + chunks)
-        corpus = [processed_query] + processed_chunks
+        # Build vocabulary
+        vocab = set(processed_query.split())
+        for chunk in processed_chunks:
+            vocab.update(chunk.split())
+        vocab = list(vocab)
+        vocab_index = {word: idx for idx, word in enumerate(vocab)}
         
-        try:
-            # Calculate TF-IDF vectors
-            vectorizer = TfidfVectorizer(
-                max_features=5000,
-                ngram_range=(1, 2),  # Include bigrams
-                min_df=1,
-                max_df=0.8
-            )
-            
-            tfidf_matrix = vectorizer.fit_transform(corpus)
-            
-            # Calculate cosine similarity between query and chunks
-            query_vector = tfidf_matrix[0:1]
-            chunk_vectors = tfidf_matrix[1:]
-            
-            similarities = cosine_similarity(query_vector, chunk_vectors)[0]
-            
-            # Combine with original chunks and sort by similarity
-            scored_chunks = [(float(sim), chunk) for sim, chunk in zip(similarities, chunks)]
-            scored_chunks.sort(key=lambda x: x[0], reverse=True)
-            
-            return scored_chunks
-            
-        except Exception as e:
-            logger.warning(f"TF-IDF calculation failed, falling back to keyword matching: {e}")
-            return self.fallback_similarity(query, chunks)
+        def tf(text):
+            tokens = text.split()
+            counts = {}
+            for token in tokens:
+                counts[token] = counts.get(token, 0) + 1
+            return counts
+        
+        def idf(docs):
+            import math
+            N = len(docs)
+            idf_dict = {}
+            for word in vocab:
+                df = sum(1 for doc in docs if word in doc.split())
+                idf_dict[word] = math.log((N + 1) / (df + 1)) + 1
+            return idf_dict
+        
+        def tfidf_vector(text, idf_dict):
+            tf_dict = tf(text)
+            vec = np.zeros(len(vocab))
+            for word, count in tf_dict.items():
+                idx = vocab_index.get(word)
+                if idx is not None:
+                    vec[idx] = count * idf_dict[word]
+            norm = np.linalg.norm(vec)
+            return vec / norm if norm > 0 else vec
+        
+        # Calculate IDF
+        all_docs = [processed_query] + processed_chunks
+        idf_dict = idf(all_docs)
+        
+        # Calculate vectors
+        query_vec = tfidf_vector(processed_query, idf_dict)
+        chunk_vecs = [tfidf_vector(chunk, idf_dict) for chunk in processed_chunks]
+        
+        # Calculate cosine similarity
+        similarities = []
+        for vec in chunk_vecs:
+            sim = float(np.dot(query_vec, vec) / (np.linalg.norm(query_vec) * np.linalg.norm(vec) + 1e-8))
+            similarities.append(sim)
+        
+        # Combine with original chunks and sort by similarity
+        scored_chunks = [(sim, chunk) for sim, chunk in zip(similarities, chunks)]
+        scored_chunks.sort(key=lambda x: x[0], reverse=True)
+        
+        return scored_chunks
     
     def fallback_similarity(self, query: str, chunks: List[str]) -> List[Tuple[float, str]]:
         """Fallback similarity calculation using keyword matching"""
@@ -246,6 +267,3 @@ class AdvancedTextProcessor:
                 break
             
             context_parts.append(chunk_with_marker)
-            current_length += len(chunk_with_marker)
-        
-        return "".join(context_parts)
